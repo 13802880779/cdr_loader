@@ -38,7 +38,7 @@ public class HBaseUtils {
 	   // final String QUORUM = "FBI001,FBI002,FBI003";
 	   // final String CLIENTPORT = "2181";
 	//	updateTableMetaWhenPropertiesFileChanged();
-		updateMetaTableWhenPropertiesFileChanged();
+		//updateMetaTableWhenPropertiesFileChanged();
         
     }
 
@@ -54,7 +54,7 @@ public class HBaseUtils {
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-			CLogger.log4j("ERROR","HBaseUtils,Create connection exception:"+e.toString());
+			CLogger.log4j("ERROR","HBaseUtils,Initailization Exception: "+e.toString());
 			CLogger.logStackTrace(e);
 		}
 	}
@@ -154,6 +154,13 @@ public class HBaseUtils {
 	
 	public synchronized static void updateTableMeta(CdrParser p) throws IOException
 	{
+		if(conf==null)
+			conf= HBaseConfiguration.create();
+		HBaseAdmin ha=new HBaseAdmin(conf);
+		
+		if(!ha.tableExists(CConf.getAppMetaTableName()))
+			createTableIfNotExist1(CConf.getAppMetaTableName());
+		ha.close();
 		
 		HTableInterface htable=getConnection().getTable(CConf.getAppMetaTableName());
 		try{
@@ -177,8 +184,9 @@ public class HBaseUtils {
 	
 	
 	
-	public synchronized static void updateMetaTableWhenPropertiesFileChanged() throws IOException
+/*	public synchronized static void updateMetaTableWhenPropertiesFileChanged() throws IOException
 	{
+		System.out.println("====>update metadata");
 		HTableInterface htable=getConnection().getTable(CConf.getAppMetaTableName());
 		try{
 		String firms[]=CConf.getCdrFirms();
@@ -187,22 +195,16 @@ public class HBaseUtils {
 			String prefixs[]=CConf.getCdrPrefix(firm);
 			for(String prefix:prefixs)
 			{
-				//String s=prefix.replaceAll("-cdr", "").replaceAll("-tdr", "");
-				int pos1=prefix.indexOf("-cdr")==-1?prefix.indexOf("-tdr"):prefix.indexOf("-cdr");
-				String cPrefix=prefix.substring(0, pos1);
-				//System.out.println(firm+","+cPrefix);
-				String idxConf=CConf.getCdrIndexConfiguration(firm, cPrefix);
-				int RegionNum=CConf.getCdrRegionNum(firm, cPrefix);
-				int IdxRegionNum=CConf.getCdrIndexRegionNum(firm, cPrefix);
+
+				String idxConf=CConf.getCdrIndexConfiguration(firm, prefix);
+				int RegionNum=CConf.getCdrRegionNum(firm, prefix);
+				int IdxRegionNum=CConf.getCdrIndexRegionNum(firm, prefix);
 				
-				
-				
-				
-				String targettable=prefix.replaceAll("-", "_");
-				targettable=targettable.toUpperCase();
+				String targettable=CConf.getCdrHTableName(firm, prefix);
+				//targettable=targettable.toUpperCase();
 				//int rNum=
 				//System.out.println(targettable+","+idxConf);
-				byte[] rk=Bytes.toBytes(targettable.toUpperCase());
+				byte[] rk=Bytes.toBytes(targettable);
 				Put p1=new Put(rk);
 				p1.add(Bytes.toBytes("C"), Bytes.toBytes("RegionsNum"), Bytes.toBytes(RegionNum));
 				p1.add(Bytes.toBytes("C"), Bytes.toBytes("IdxRegionsNum"), Bytes.toBytes(IdxRegionNum));
@@ -220,7 +222,7 @@ public class HBaseUtils {
 		htable.close();		
 		}
 	}
-	
+	*/
 	public static byte[] getTableMeta(String tn,String metaName) throws IOException
 	{
 		//System.out.println(CConf.getCdrMetaTable());
@@ -259,7 +261,29 @@ public class HBaseUtils {
 		}
 
 	}
-	
+	public synchronized static void createTableIfNotExist(String tn,int rNum) throws MasterNotRunningException, ZooKeeperConnectionException, IOException
+	{
+		if(conf==null)
+			conf= HBaseConfiguration.create();
+		HBaseAdmin ha=new HBaseAdmin(conf);
+		if(!ha.tableExists(tn))
+		{
+			HTableDescriptor tableDesc =  new   HTableDescriptor(tn);
+			tableDesc.setValue(HTableDescriptor.SPLIT_POLICY, ConstantSizeRegionSplitPolicy.class.getName());
+	    	HColumnDescriptor hd=new HColumnDescriptor("C");
+	    	hd.setBloomFilterType(BloomType.ROW);//default ROW
+	    	hd.setCompactionCompressionType(Compression.Algorithm.SNAPPY);
+	    	hd.setCompressionType(Compression.Algorithm.SNAPPY);
+	    	hd.setMaxVersions(1);
+	    	tableDesc.addFamily(hd);
+	    	//ha.createTable(tableDesc);
+	    	ha.createTable(tableDesc,getIntPartionSplitKeys(rNum));	
+	    	ha.close();
+	    	
+	    	CLogger.log4j("INFO","HBaseUtils,Created new table:"+tn);
+		}
+
+	}
 
 	public static byte[][] getIntPartionSplitKeys(int numPartions)
 	{

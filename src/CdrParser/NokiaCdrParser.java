@@ -82,4 +82,16 @@ public class NokiaCdrParser extends CdrParser {
 		
 	}
 
+	@Override
+	public String getHDFSUploadDir() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public String getBulkLoadDir() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
 }

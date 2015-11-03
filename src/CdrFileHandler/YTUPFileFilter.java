@@ -1,5 +1,6 @@
 package CdrFileHandler;
 
+
 import java.io.File;
 import java.io.FileFilter;
 
@@ -11,7 +12,7 @@ import CdrConfiguration.CConf;
  * @usage 针对ZC PS南向服务器目录结构专门设置到文件过滤器
  *
  */
-public class ZCCdrFileFilter implements FileFilter{
+public class YTUPFileFilter implements FileFilter{
 
 
 	@Override
@@ -28,12 +29,6 @@ public class ZCCdrFileFilter implements FileFilter{
 		if(f.isDirectory())
 			return true;
 		
-		//System.out.println("file filted!"+f.getParent());
-		if(!f.getParent().endsWith("/bak"))
-		{	
-			//System.out.println("file filted!"+f.getAbsolutePath());
-			return false;		
-		}
 		
 		String[] ValidCdrTypes=CConf.getCdrFileSuffix();
 		for(String s:ValidCdrTypes)

@@ -170,7 +170,7 @@ public class ZCCdrParser extends CdrParser{
 		String revMsisdn;
 		long msisdn;
 		
-		if(StrUtils.isBlankString(r[this.cMsisdnIdx]))//如果是空号码，那么生成一个随机的18位到数字
+		if(StrUtils.isBlankorZeroString(r[this.cMsisdnIdx]))//如果是空号码，那么生成一个随机的18位到数字
 		{
 			msisdn=(long)(Math.random()*1000000000000000000L);//生成一个随机到18位数字
 			revMsisdn=StringUtils.rightPad(String.valueOf(msisdn), 18,"0");
@@ -325,6 +325,18 @@ public class ZCCdrParser extends CdrParser{
 			CLogger.logStackTrace(e);
 		}
 		
+	}
+
+	@Override
+	public String getHDFSUploadDir() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public String getBulkLoadDir() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 	
 

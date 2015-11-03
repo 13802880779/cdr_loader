@@ -6,7 +6,10 @@ import org.apache.commons.io.monitor.FileAlterationMonitor;
 import org.apache.commons.io.monitor.FileAlterationObserver;
 
 import CdrConfiguration.CConf;
-import CdrLoadHandler.CdrWorker;
+import CdrExceptions.FirmNotFoundException;
+import CdrLoadHandler.BulkLoadWorker;
+import CdrLoadHandler.JobManager;
+import CdrLoadHandler.BatchPutWorker;
 import CdrLogger.CLogger;
 import CdrParser.CdrParser;
 
@@ -32,12 +35,12 @@ public class FileWatcher {
     
     private ExecutorService service;
     //保存当前所有正在被处理或等待处理到文件列表
-    public static ArrayList<JobQueueObj>JobQueue=new ArrayList();
+  //  public static ArrayList<JobQueueObj>JobQueue=new ArrayList();
     
-    public FileWatcher(ExecutorService service)
-    {
-    	this.service=service;
-    }
+   // public FileWatcher(ExecutorService service)
+   // {
+    //	this.service=service;
+   // }
     
     public void start() throws Exception
     {
@@ -53,7 +56,7 @@ public class FileWatcher {
  			System.out.println("add monitor path:"+directory[i]);
  			 observers[i] = new FileAlterationObserver(directory[i], ff);
  	        //设置文件变化监听器
- 			observers[i].addListener(new CdrFileListener(this.service));
+ 			observers[i].addListener(new CdrFileListener());
  		}
        
          
@@ -69,84 +72,12 @@ public class FileWatcher {
         CdrMonitor.start();
         
         
-    }
-    
-    public synchronized static void add2JobQueue(JobQueueObj jqobj)
-    {
-    	JobQueue.add(jqobj);
-    }
-    public synchronized static void removeFromJobQueue(String fp)
-    {
-    	for(int i=0;i<JobQueue.size();i++)
-    	{
-    		JobQueueObj obj=JobQueue.get(i);
-    		
-    		if(fp.equals(obj.JobName))
-    		{
-    			JobQueue.remove(i);
-    			i--;
-    			//System.out.println("remove from job queue==>"+fp);
-    			//break;
-    		}
-    	}
-    	//FilesQueue.remove(fp);
-    }
-    public static int getJobQueueSize()
-    {
-    	return JobQueue.size();
-    }
-    public static int getJobQueueCounter1()
-    {
-    	int M1Counter=0;
-    	for(JobQueueObj obj:JobQueue)
-    	{
-    		long interval=System.currentTimeMillis()-obj.JobAddTime;
-    		if(interval>60*1000L && interval<=60*5*1000L)
-    			M1Counter++;
+    }    
 
-    	}
-    	return M1Counter;
-
-    }
-    
-    public static int getJobQueueCounter2()
-    {
-    	int M5Counter=0;
-    	for(JobQueueObj obj:JobQueue)
-    	{
-    		long interval=System.currentTimeMillis()-obj.JobAddTime;
-    		if(interval>60*5*1000L)
-    			M5Counter++;
-    	}
-    	return M5Counter;
-
-    }
-    
-    public static String getJobQueueStat()
-    {
-    	int M1Counter=0,M5Counter=0;
-    	for(JobQueueObj obj:JobQueue)
-    	{
-    		if(System.currentTimeMillis()-obj.JobAddTime>60*5*1000L)
-    			M5Counter++;
-    		else if(System.currentTimeMillis()-obj.JobAddTime>60*1000L)
-    			M1Counter++;
-
-    	}
-    	return "Job Queue Size: "+JobQueue.size()+", Dealy(>60s&<=300s): "+M1Counter+", Delay(>300s): "+M5Counter;
-    }
 }
 
 
-final class JobQueueObj{
-	public String JobName;
-	public long JobAddTime;
-	public JobQueueObj(String jn,long jt)
-	{
-		this.JobAddTime=jt;
-		this.JobName=jn;
-	}
-}
+
 
 
 final class PropertyFileListener implements FileAlterationListener
@@ -207,12 +138,12 @@ final class PropertyFileListener implements FileAlterationListener
 }
 
 final class CdrFileListener implements FileAlterationListener{
-	private ExecutorService service;
+	//private ExecutorService service;
 	
 	
-	public CdrFileListener(ExecutorService service)
+	public CdrFileListener()
 	{
-		this.service=service;
+		//this.service=service;
 	}
     @Override
     public void onStart(FileAlterationObserver fileAlterationObserver) {
@@ -240,11 +171,9 @@ final class CdrFileListener implements FileAlterationListener{
 
     @Override
     public void onFileCreate(File file) {
-       System.out.println("File Created: "+file.getAbsolutePath());
-       JobQueueObj obj=new JobQueueObj(file.getAbsolutePath(),System.currentTimeMillis());
-       FileWatcher.add2JobQueue(obj);
-       CdrWorker cw=new CdrWorker(file);
-       service.execute(cw);
+		System.out.println("File Created: " + file.getAbsolutePath());
+		
+		JobManager.SummitJob(file);
     }
 
 

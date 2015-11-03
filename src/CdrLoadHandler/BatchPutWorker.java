@@ -15,7 +15,6 @@ import org.apache.hadoop.hbase.util.Bytes;
 
 import CdrConfiguration.CConf;
 import CdrFileHandler.FileWatcher;
-import CdrFileHandler.RetryFile;
 import CdrLogger.CLogger;
 import CdrMonitor.MonitorObject;
 import CdrMonitor.MonitorThread;
@@ -24,7 +23,7 @@ import CdrParser.CdrIndexParser;
 import CdrUtils.HBaseUtils;
 import CdrUtils.StrUtils;
 
-public class CdrWorker implements Runnable {
+public class BatchPutWorker implements Runnable {
 	
 	public static void main(String args[])
 	{
@@ -42,13 +41,12 @@ public class CdrWorker implements Runnable {
 	//	cw.run();
 	} 
 
-	File F=null;
-	
+	File F=null;	
 	private long fileSize=0L;
 	private long rowsCount=0L;
 	private long skippedRowsCount=0L;
 	private String status="RUNNING";
-	private CdrParser cp;
+	private CdrParser cp=null;
 	private long starttime=0L;
 	private long endtime=0L;
 	private long endtime2=0L;
@@ -56,12 +54,17 @@ public class CdrWorker implements Runnable {
 	private long indexCount=0L;
 	
 	
-	public CdrWorker(File f)
+//	public BatchPutWorker(File f)
+	//{
+	//	this.F=f;
+		
+//	}
+	public BatchPutWorker(File f,CdrParser p)
 	{
 		this.F=f;
-		
+		this.cp=p;
 	}
-	
+
 	public long getFileSize()
 	{
 		return F.length();	
@@ -80,30 +83,22 @@ public class CdrWorker implements Runnable {
 		//parse file->file date,htable name,rowkey...
 		CLogger.log4j("INFO", "Worker Started, Processing: "+F.getAbsolutePath());
 		
-		RetryFile rf=new RetryFile();
-		
+		RetryQueue retryQueue=new RetryQueue();
+		try {	
 		//after a long wait, the file may be deleted or move!
 		if(!F.exists())
 		{
 			//文件被删除或者被移动，直接退出
-			FileWatcher.removeFromJobQueue(F.getAbsolutePath());
+			//JobQueue.removeFromJobQueue(F.getAbsolutePath());
 			CLogger.log4j("ERROR","Worker Terminated, File Not Found: "+F.getAbsolutePath());
 			this.status="FILE_NOT_FOUND";
-			rf.push2Retry(F);//put to retry file list
+			retryQueue.removeFromRetry(F);
 			return;
 		}
-		try {		
-		String firm=CdrParser.findFirmByFileName(F.getName());
-		//如果直接在findFirmByFileName方法中抛出异常，那就没这么麻烦了！
-		//if(firm==null)
-		//{
-		//	CLogger.log4j("ERROR","Worker thread, Can not determine cdr firms, skip: "+F.getAbsolutePath());
-		//	this.status="FILE_SKIPPED";
-		//	return;
-		//}
-		Class<?> c;
 
-			c = Class.forName(CConf.getCdrParserClassName(firm));
+
+			/*String firm=CdrParser.findFirmByFileName(F.getName());
+			Class<?> c = Class.forName(CConf.getCdrParserClassName(firm));
 			Constructor<?> c1=c.getDeclaredConstructor(File.class);
 			c1.setAccessible(true);
 			cp=(CdrParser)c1.newInstance(F);
@@ -111,11 +106,11 @@ public class CdrWorker implements Runnable {
 			int flag=cp.parse();
 			if(flag==-1)
 			{
-				FileWatcher.removeFromJobQueue(F.getAbsolutePath());
+				JobQueue.removeFromJobQueue(F.getAbsolutePath());
 				CLogger.log4j("ERROR","Worker Terminated, File parse error: "+F.getAbsolutePath());
 				this.status="FILE_PARSE_ERROR";
 				return;
-			}
+			}*/
 			
 			//创建hbase表，并将表元数据信息保存到cdr_metadata表中
 			HBaseUtils.createTableIfNotExist(cp);
@@ -149,8 +144,7 @@ public class CdrWorker implements Runnable {
 				byte[] rk=cp.generatetRowKey(r);				
 				if(rk==null){
 					this.skippedRowsCount++;	
-					//System.out.println(row);
-					//CLogger.log4j("INFO",row);
+
 					continue;
 				}
 				
@@ -162,7 +156,6 @@ public class CdrWorker implements Runnable {
 				
 				if (pl.size() > BATCH_SIZE) {
 					ht.put(pl);
-					//ht.flushCommits();
 					pl.clear();
 				}	
 				
@@ -210,16 +203,11 @@ public class CdrWorker implements Runnable {
 			
 			this.endtime=System.currentTimeMillis();
 			
-			//保存二级索引
-			/*if(si_pl.size()!=0){			
-			HTableInterface si_htable=HBaseUtils.getConnection().getTable(cp.getCdrIndexHTable());
-			si_htable.setAutoFlush(false);
-			si_htable.setWriteBufferSize(1024*1024*8);
-			si_htable.put(si_pl);
-			si_pl.clear();
-			si_htable.close();
-			this.endtime2=System.currentTimeMillis();
-			}*/
+			this.status="SUCCESSED";		
+			//JobQueue.removeFromJobQueue(F.getAbsolutePath());	//move to finally	
+			//may this job comes from retry queue, so delete it
+			retryQueue.removeFromRetry(F);
+			CLogger.logProcessedFiles(getTaskStat());
 
 		} catch (Exception  e) {
 			// TODO Auto-generated catch block
@@ -228,17 +216,16 @@ public class CdrWorker implements Runnable {
 			CLogger.log4j("ERROR","Worker thread Exception, "+e.toString()+","+F.getAbsolutePath());
 			CLogger.logStackTrace(e);
 			
+			//JobQueue.removeFromJobQueue(F.getAbsolutePath());//move to finally
 			//可能是网络、hbase集群等问题导致到异常，将文件加入到重试列表
-			rf.push2Retry(F);
-			return;			
+			retryQueue.push2Retry(F);
+			//return;			
+		}finally{
+			JobQueue.removeFromJobQueue(F.getAbsolutePath());
 		}
+
 		
-		add2Monitor();
-		
-		this.status="SUCCESSED";		
-		rf.removeFromRetry(F);
-		FileWatcher.removeFromJobQueue(F.getAbsolutePath());
-		CLogger.logProcessedFiles(getTaskStat());
+
 		
 
 	}
@@ -281,15 +268,17 @@ public class CdrWorker implements Runnable {
 	private void add2Monitor()
 	{
 		long ts=System.currentTimeMillis();
-		MonitorObject mo=new MonitorObject(cp.getCdrTargetHTable()+"_rc",ts,this.getRowsCount());
+	/*	MonitorObject mo=new MonitorObject(cp.getCdrTargetHTable(),"RowsCount",ts,this.getRowsCount());
 		MonitorThread.addMonitorObj(mo);
-		mo=new MonitorObject(cp.getCdrIndexHTable()+"_irc",ts,this.getIndexRowCount());
+		mo=new MonitorObject(cp.getCdrIndexHTable(),"IndexRowsCount",ts,this.getIndexRowCount());
 		MonitorThread.addMonitorObj(mo);
-		mo=new MonitorObject(cp.getCdrTargetHTable()+"_src",ts,this.getSkippedRowsCount());
+		mo=new MonitorObject(cp.getCdrTargetHTable(),"SkippedRowsCount",ts,this.getSkippedRowsCount());
 		MonitorThread.addMonitorObj(mo);
-		mo=new MonitorObject(cp.getCdrTargetHTable()+"_fs",ts,this.getFileSize());
+		mo=new MonitorObject(cp.getCdrTargetHTable(),"FileSize",ts,this.getFileSize());
 		MonitorThread.addMonitorObj(mo);
-		mo=new MonitorObject(cp.getCdrTargetHTable()+"_ut",ts,this.getUsedTime());
+		mo=new MonitorObject(cp.getCdrTargetHTable(),"UsedTime",ts,this.getUsedTime());		
+		MonitorThread.addMonitorObj(mo);*/
+		MonitorObject mo=new MonitorObject(cp.getCdrTargetHTable(),"TaskStat",ts,this.getTaskStat());		
 		MonitorThread.addMonitorObj(mo);
 
 	}

@@ -1,9 +1,5 @@
-/CdrConfiguration/
-/CdrExceptions/
-/CdrFileHandler/
 /CdrLoadHandler/
-/CdrLoaderMain.class
-/CdrLogger/
-/CdrMonitor/
-/CdrParser/
+/CdrFileHandler/
 /CdrUtils/
+/CdrParser/
+/CdrConfiguration/

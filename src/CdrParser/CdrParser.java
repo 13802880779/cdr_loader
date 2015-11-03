@@ -28,6 +28,8 @@ public abstract class CdrParser {
 	String cSecIdxConfiguration="";
 	CdrIndexParser csip;
 	Durability cDurablity=Durability.SYNC_WAL;
+	String cLoadType="batch_put";
+	String cColumnName="D";
 		
 	public CdrParser(File f)
 	{
@@ -42,6 +44,9 @@ public abstract class CdrParser {
 	abstract public byte[] generatetRowKey(final String[] r);
 	abstract public ArrayList<byte[]> generateIndexRowkey(String[] r, int rNum,byte[] rk);
 	abstract public void actionAfterLoad(File fsrc);
+	abstract public String getHDFSUploadDir();
+	abstract public String getBulkLoadDir();
+	
 	
 	//abstract public byte[] getIndexRowkey(byte[] idxColName,byte[] idxContent, byte[] )
 	public Durability getHtableDurability(){return cDurablity;};
@@ -59,8 +64,9 @@ public abstract class CdrParser {
 	public String getDelim(){return this.cDelim;}
 	public String getPrefix(){return this.cPrefix;};
 	public String getSecondaryIndexConfiguration(){return this.cSecIdxConfiguration;}
-	
-	
+	public String getLoadType(){return this.cLoadType;}
+	public int getPrimaryKeyIndex(){return this.cMsisdnIdx;}
+	public String geColumnName(){return this.cColumnName;}
 	public String toString(){
 		return cName+"#"+cFirm+"#"+cPrefix+"#"+cDate+"#"+cTargetTable+"#"+cPreBuildRegionNum;
 	}

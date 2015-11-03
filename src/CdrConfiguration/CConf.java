@@ -326,6 +326,11 @@ public class CConf {
 		return CConf.getParamByName("cdr."+firm+"."+prefix+".secondary.index.pre-build.region.num")==null?10:Integer.parseInt(CConf.getParamByName("cdr."+firm+"."+prefix+".secondary.index.pre-build.region.num"));
 	}
 
+	public static String getCdrLoadType(String firm,String prefix)
+	{
+		return CConf.getParamByName("cdr."+firm+"."+prefix+".loader.type");
+	}
+	
 	public static String getActionAfterLoad(String firm)
 	{
 		return CConf.getParamByName("cdr."+firm+".action.afterload");
@@ -343,9 +348,23 @@ public class CConf {
 		return CConf.getParamByName("app.htable.batch.put.size")==null?1000:Integer.parseInt(CConf.getParamByName("app.htable.batch.put.size"));
 	}
 	
+	public static String getHdfsUploadDir(String firm,String prefix)
+	{
+		return formatLogName(CConf.getParamByName("cdr."+firm+"."+prefix+".hdfs.upload.dir"));
+	}
+	public static String getBulkLoadTmpDir(String firm,String prefix)
+	{
+		return formatLogName(CConf.getParamByName("cdr."+firm+"."+prefix+".bulkload.dir"));
+	}
+	public static String getColumnName(String firm,String prefix)
+	{
+		return formatLogName(CConf.getParamByName("cdr."+firm+"."+prefix+".column.name"));
+	}
 	
 	public static String formatLogName(String s)
 	{
+		if(s==null)
+			return null;
 		Calendar c=Calendar.getInstance();
 		//String month=;
 		String ss=new String(s);
